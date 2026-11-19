@@ -49,9 +49,12 @@ import {
 
 const LargeTextViewer = lazy(() => import("./LargeTextViewer"));
 
-const OfficeFilePreview = lazy(() =>
-  import("./OfficeFilePreview").then((module) => ({ default: module.OfficeFilePreview })),
-);
+const OfficeFilePreview =
+  import.meta.env.MODE === "jetbrains"
+    ? null
+    : lazy(() =>
+        import("./OfficeFilePreview").then((module) => ({ default: module.OfficeFilePreview })),
+      );
 
 const FontFilePreview = lazy(() =>
   import("./FontFilePreview").then((module) => ({ default: module.FontFilePreview })),
@@ -110,7 +113,7 @@ export function AttachmentFilePreview(props: {
   onClose?: () => void;
 }) {
   const kind = filePreviewKind(props);
-  const officeKind = officePreviewKind(props);
+  const officeKind = OfficeFilePreview ? officePreviewKind(props) : null;
   const delimiter = filePreviewDelimiter(props);
   const renderedMode =
     kind === "mermaid"
@@ -331,7 +334,7 @@ export function AttachmentFilePreview(props: {
     <Suspense fallback={<FileSurfaceLoading />}>
       <FontFilePreview src={url} name={props.name} />
     </Suspense>
-  ) : officeKind ? (
+  ) : officeKind && OfficeFilePreview ? (
     <Suspense fallback={<FileSurfaceLoading />}>
       <OfficeFilePreview
         src={url}

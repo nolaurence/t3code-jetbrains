@@ -19,6 +19,10 @@ import { resolveDiffThemeName } from "../../lib/diffRendering";
 import { getSyntaxHighlighterPromise } from "../../lib/syntaxHighlighting";
 import { useTurnItemDetail } from "../../state/queries";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
+import {
+  reportJetBrainsFileOpenFailure,
+  useJetBrainsFileOpener,
+} from "../../hooks/useJetBrainsFileOpener";
 import { Button } from "../ui/button";
 import ChatMarkdown from "../ChatMarkdown";
 import { ChatMarkdownAssetImage } from "./ChatMarkdownMedia";
@@ -224,6 +228,7 @@ function ToolCallBody(
 }
 
 export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspectorProps) {
+  const openInJetBrains = useJetBrainsFileOpener(props.environmentId, props.workspaceRoot);
   // Command rows stream their output, including the final output, from the server.
   const environmentStreamsOutput = useCommandOutputStreaming(props.environmentId);
   const streamsOutput =
@@ -275,9 +280,22 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
       {item.type === "file_change" ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-muted-foreground">
-              {formatWorkspaceRelativePath(item.fileName, props.workspaceRoot)}
-            </span>
+            {openInJetBrains ? (
+              <button
+                type="button"
+                className="font-mono text-primary hover:underline"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void openInJetBrains(item.fileName).catch(reportJetBrainsFileOpenFailure);
+                }}
+              >
+                {formatWorkspaceRelativePath(item.fileName, props.workspaceRoot)}
+              </button>
+            ) : (
+              <span className="font-mono text-muted-foreground">
+                {formatWorkspaceRelativePath(item.fileName, props.workspaceRoot)}
+              </span>
+            )}
             {item.additions !== undefined || item.deletions !== undefined ? (
               <span>
                 <span className="text-diff-addition">+{formatDiffCount(item.additions ?? 0)}</span>{" "}

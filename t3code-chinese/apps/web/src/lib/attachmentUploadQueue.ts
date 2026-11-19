@@ -25,6 +25,7 @@ import {
 } from "../composerDraftStore";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentCatalog } from "../connection/catalog";
+import { jetBrainsHost } from "../jetbrains";
 import { assetEnvironment } from "../state/assets";
 import { attachmentEnvironment } from "../state/attachments";
 import { readEnvironmentScope, readPreparedConnection } from "../state/session";
@@ -139,6 +140,7 @@ function uploadBytes(input: {
   readonly onProgress: (progress: number) => void;
 }): { readonly done: Promise<void>; readonly abort: () => void } {
   const xhr = new XMLHttpRequest();
+  const controller = new AbortController();
   const done = new Promise<void>((resolve, reject) => {
     xhr.open("POST", input.url, true);
     xhr.timeout = UPLOAD_TIMEOUT_MS;
@@ -157,11 +159,29 @@ function uploadBytes(input: {
     });
     xhr.addEventListener("error", () => reject(new Error("Upload failed")));
     xhr.addEventListener("timeout", () => reject(new Error("Upload timed out")));
-    xhr.addEventListener("abort", () => reject(new Error("Upload cancelled")));
-    xhr.send(input.file);
+    controller.signal.addEventListener(
+      "abort",
+      () => {
+        xhr.abort();
+        reject(new Error("Upload cancelled"));
+      },
+      { once: true },
+    );
+
+    if (jetBrainsHost && new URL(input.url).origin === location.origin) {
+      // The JCEF bridge accepts byte elements, not the file elements generated for File bodies.
+      void input.file
+        .arrayBuffer()
+        .then((bytes) => {
+          if (!controller.signal.aborted) xhr.send(bytes);
+        })
+        .catch(reject);
+    } else {
+      xhr.send(input.file);
+    }
   });
 
-  return { done, abort: () => xhr.abort() };
+  return { done, abort: () => controller.abort() };
 }
 
 async function runUpload(job: UploadJob): Promise<void> {

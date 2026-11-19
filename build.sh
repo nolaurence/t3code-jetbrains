@@ -32,15 +32,22 @@ chmod +x "$runtime/node"
 find src/main/java -name '*.java' > "$output/main-sources"
 "${jdk}javac" --release 21 -cp "$classpath" -d "$output/main" @"$output/main-sources"
 if [[ ${1:-} == test ]]; then
-  node --input-type=module - "$runtime/client/.vite/manifest.json" <<'EOF'
-import { readFileSync } from 'node:fs';
-const manifest = JSON.parse(readFileSync(process.argv[2], 'utf8'));
-const removed = Object.keys(manifest).filter((key) => /\/(ChatRightPanel|ChatTerminalDrawers|RightPanelSurfaceContent|PreviewPanel|DiffPanel|DevicePanel|FilePreviewPanel)\.tsx$/.test(key));
-if (removed.length) throw new Error(`Workspace panel code was bundled: ${removed.join(', ')}`);
+  node --input-type=module - "$runtime/client" <<'EOF'
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+const client = process.argv[2];
+const manifest = JSON.parse(readFileSync(join(client, '.vite/manifest.json'), 'utf8'));
+const removed = Object.keys(manifest).filter((key) => /\/(ChatRightPanel|ChatTerminalDrawers|RightPanelSurfaceContent|PreviewPanel|DiffPanel|DevicePanel|FilePreviewPanel|ThreadPreviewMiniPlayer|OfficeFilePreview|OfficeViewer|OpenXmlOfficeViewer)\.tsx$/.test(key));
+const assets = readdirSync(join(client, 'assets'), { recursive: true }).filter((key) =>
+  /\.glb$/i.test(key) || /^(?:docx_|pptx_|xlsx_).*\.wasm$/.test(key) ||
+  /^(?:officePreview|document|presentation|spreadsheet)\.worker-/.test(key),
+);
+if (removed.length || assets.length) throw new Error(`Excluded JetBrains preview features were bundled: ${[...removed, ...assets].join(', ')}`);
 EOF
   find src/test/java -name '*.java' > "$output/test-sources"
   "${jdk}javac" --release 21 -cp "$output/main:$classpath" -d "$output/test" @"$output/test-sources"
   "${jdk}java" -cp "$output/test:$output/main:$classpath" dev.t3code.jetbrains.LocalCliTest
+  "${jdk}java" -cp "$output/test:$output/main:$classpath" dev.t3code.jetbrains.IdeFileOpenerTest
   "${jdk}java" -cp "$output/test:$output/main:$classpath" dev.t3code.jetbrains.EmbeddedRuntimeEnvironmentTest "$runtime"
 fi
 jar --create --file "$output/stage/t3code-jetbrains/lib/t3code-jetbrains.jar" \

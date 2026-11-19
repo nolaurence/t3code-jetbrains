@@ -1,3 +1,4 @@
+import { RegistryContext } from "@effect/atom-react";
 import {
   AuthOrchestrationOperateScope,
   EnvironmentId,
@@ -12,9 +13,12 @@ import { expect, it, vi } from "vite-plus/test";
 
 import { act, render } from "../../test/render";
 import { useRightPanelStore } from "../rightPanelStore";
+import { appAtomRegistry } from "../rpc/atomRegistry";
+import { primaryEnvironmentIdAtom } from "../state/primaryEnvironment";
 
 const state = vi.hoisted(() => ({
   allowed: true,
+  openIdeFile: vi.fn(),
   listeners: new Set<() => void>(),
   openEditor: vi.fn(),
   link: vi.fn(),
@@ -27,6 +31,17 @@ const state = vi.hoisted(() => ({
   pullRequests: [] as ThreadPullRequestLink[],
 }));
 
+vi.mock(import("../jetbrains"), async (original) => ({
+  ...(await original()),
+  jetBrainsHost: { surface: "editor", openPage: () => {}, openFile: state.openIdeFile },
+}));
+vi.mock(import("../state/primaryEnvironment"), async (original) => {
+  const { Atom } = await import("effect/reactivity");
+  return {
+    ...(await original()),
+    primaryEnvironmentIdAtom: Atom.make<EnvironmentId | null>(null).pipe(Atom.keepAlive),
+  };
+});
 vi.mock(import("../state/use-atom-query-runner"), async (original) => ({
   ...(await original()),
   useAtomQueryRunner: (() => state.search) as never,
@@ -128,6 +143,7 @@ const serverConfig = {
 function setup() {
   using stack = new DisposableStack();
   state.allowed = true;
+  state.openIdeFile.mockReset().mockResolvedValue(undefined);
   state.listeners.clear();
   state.pullRequests = [];
   state.openEditor.mockReset().mockResolvedValue(AsyncResult.success(undefined));
@@ -193,6 +209,39 @@ it("removes host actions after revocation while keeping file preview and copying
   await vi.waitFor(() => expect(state.copy).toHaveBeenCalledWith("/work/docs/readme.md"));
   await act(async () => screen.anchor().click());
   expect(state.openFile).toHaveBeenCalledWith(threadRef, "docs/readme.md", undefined);
+  expect(state.openEditor).not.toHaveBeenCalled();
+});
+
+it("opens file links and inline paths in the current IDE without modifiers", async () => {
+  using setupStack = setup();
+  const primary = primaryEnvironmentIdAtom as Parameters<
+    typeof appAtomRegistry.set<EnvironmentId | null>
+  >[0];
+  appAtomRegistry.set(primary, threadRef.environmentId);
+  setupStack.defer(() => appAtomRegistry.set(primary, null));
+  await using screen = await render(
+    <RegistryContext value={appAtomRegistry}>
+      <ChatMarkdown
+        cwd="/work"
+        threadRef={threadRef}
+        text="[Code](src/example.ts:8:3) and `docs/readme.md`"
+      />
+    </RegistryContext>,
+  );
+  const [code, readme] = screen.container.querySelectorAll("a");
+  await act(async () => code?.click());
+  await vi.waitFor(() =>
+    expect(state.openIdeFile).toHaveBeenNthCalledWith(1, {
+      path: "/work/src/example.ts",
+      line: 8,
+      column: 3,
+    }),
+  );
+  await act(async () => readme?.click());
+  await vi.waitFor(() =>
+    expect(state.openIdeFile).toHaveBeenNthCalledWith(2, { path: "/work/docs/readme.md" }),
+  );
+  expect(state.openFile).not.toHaveBeenCalled();
   expect(state.openEditor).not.toHaveBeenCalled();
 });
 

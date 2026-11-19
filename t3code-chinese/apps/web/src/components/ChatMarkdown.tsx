@@ -155,6 +155,7 @@ import { cn } from "../lib/utils";
 import { resolveRemoteOpenState, useRemoteOpenResolution } from "../remoteOpen";
 import { useRightPanelStore } from "../rightPanelStore";
 import { chatWorkspacePanelsEnabled } from "../jetbrains";
+import { useJetBrainsFileOpener } from "../hooks/useJetBrainsFileOpener";
 import { readThreadShell, useProjects } from "../state/entities";
 import { serverEnvironment } from "../state/server";
 import { shellEnvironment } from "../state/shell";
@@ -555,6 +556,7 @@ function useChatMarkdownState({
   });
   const pullRequestLinking = usePullRequestLinking(threadRef?.environmentId);
   const environmentId = threadRef?.environmentId ?? explicitEnvironmentId ?? null;
+  const openInJetBrains = useJetBrainsFileOpener(environmentId, imageBaseDir ?? cwd);
   const canOperateHost = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
   const canOperatePreview = useEnvironmentScope(environmentId, AuthPreviewOperateScope);
   const isClientHost = useAtomValue(clientHostEnvironmentAtom(environmentId));
@@ -820,6 +822,7 @@ function useChatMarkdownState({
         findWorkspaceMatch: () => findWorkspaceFileMatch(fileLinkMeta),
       });
     const isAppBundle = isMacOS && fileLinkMeta.filePath.endsWith(".app");
+    const openInIde = isAppBundle ? undefined : openInJetBrains;
     const canOpenApp =
       environmentId !== null &&
       isAppBundle &&
@@ -861,19 +864,29 @@ function useChatMarkdownState({
         copyMarkdown={copyMarkdown}
         theme={resolvedTheme}
         threadRef={threadRef}
+        preferEditor={openInIde !== undefined}
         onOpen={
-          canOpenApp
-            ? async () =>
-                openInEditor({
-                  environmentId,
-                  input: { cwd: (await resolveHostPath()).absolutePath, editor: "file-manager" },
-                })
-            : canUseShellActions
+          openInIde
+            ? async () => {
+                await openInIde(
+                  (await resolveHostPath()).absolutePath,
+                  fileLinkMeta.line,
+                  fileLinkMeta.column,
+                );
+                return AsyncResult.success(undefined);
+              }
+            : canOpenApp
               ? async () =>
-                  openInPreferredEditor(
-                    markdownFileEditorTarget(fileLinkMeta, await resolveHostPath()),
-                  )
-              : undefined
+                  openInEditor({
+                    environmentId,
+                    input: { cwd: (await resolveHostPath()).absolutePath, editor: "file-manager" },
+                  })
+              : canUseShellActions
+                ? async () =>
+                    openInPreferredEditor(
+                      markdownFileEditorTarget(fileLinkMeta, await resolveHostPath()),
+                    )
+                : undefined
         }
         resolveCopyPaths={async () =>
           markdownFileCopyPaths(fileLinkMeta, await resolveHostPath(), cwd)
@@ -886,7 +899,9 @@ function useChatMarkdownState({
             ? () => openMarkdownMedia(mediaPath, fileLinkMeta.filePath)
             : undefined
         }
-        openInEditorMenuLabel={canOpenApp ? "Open app" : preferredEditorMenuLabel}
+        openInEditorMenuLabel={
+          openInIde ? "Open in current IDE" : canOpenApp ? "Open app" : preferredEditorMenuLabel
+        }
         onReveal={
           canUseShellActions && revealInFileManagerLabel !== undefined
             ? async () => revealFileInFileManager((await resolveHostPath()).absolutePath)

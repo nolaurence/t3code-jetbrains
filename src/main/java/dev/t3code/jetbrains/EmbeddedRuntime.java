@@ -49,6 +49,7 @@ public final class EmbeddedRuntime implements Disposable {
     }
 
     static EmbeddedRuntime of(Project project) { return project.getService(EmbeddedRuntime.class); }
+    Project project() { return project; }
     void track(String id, Consumer<JsonObject> client) { pending.put(id, client); }
     void forget(String id) { pending.remove(id); }
 

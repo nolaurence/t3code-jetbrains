@@ -12,6 +12,7 @@ import {
 } from "../composerDraftStore";
 
 const mocks = vi.hoisted(() => ({
+  jetBrainsHost: undefined as object | undefined,
   connectionStateAtom: vi.fn(),
   createAssetUrl: vi.fn(),
   createUploadUrl: Symbol("create-upload-url"),
@@ -20,6 +21,12 @@ const mocks = vi.hoisted(() => ({
   runAtomCommand: vi.fn(),
   readEnvironmentScope: vi.fn(),
   readPreparedConnection: vi.fn(),
+}));
+
+vi.mock("../jetbrains", () => ({
+  get jetBrainsHost() {
+    return mocks.jetBrainsHost;
+  },
 }));
 
 vi.mock("@t3tools/client-runtime/state/runtime", () => ({
@@ -81,6 +88,7 @@ class TestXmlHttpRequest {
   url: string | null = null;
   readonly headers = new Map<string, string>();
   readonly listeners = new Map<string, () => void>();
+  readonly sent = Promise.withResolvers<File | ArrayBuffer>();
   progressListener: ProgressListener | null = null;
 
   readonly upload = {
@@ -106,7 +114,7 @@ class TestXmlHttpRequest {
     this.listeners.set(event, listener);
   }
 
-  send(): void {}
+  send = vi.fn((body: File | ArrayBuffer) => this.sent.resolve(body));
 
   abort(): void {
     this.listeners.get("abort")?.();
@@ -165,6 +173,7 @@ function setConnected(environmentId: EnvironmentId, connected: boolean) {
 
 describe("attachmentUploadQueue", () => {
   beforeEach(() => {
+    mocks.jetBrainsHost = undefined;
     mocks.connectionStateAtom.mockImplementation(connectionStates);
     setConnected(firstEnvironment, true);
     setConnected(secondEnvironment, true);
@@ -314,6 +323,7 @@ describe("attachmentUploadQueue", () => {
     expect(request.url).toBe(
       "https://environment.test/api/attachments/upload/pending-environment-1-image-1.png",
     );
+    expect(await request.sent.promise).toBe(image.file);
     request.progress(1, 3);
     expect(readAttachmentUpload(image.id)).toMatchObject({ status: "uploading", progress: 1 / 3 });
 
@@ -348,6 +358,51 @@ describe("attachmentUploadQueue", () => {
       },
       expect.anything(),
     );
+  });
+
+  it.each(["http://t3-project.localhost", "https://environment.test"])(
+    "uses bytes only for uploads to the JetBrains bridge (%s)",
+    async (origin) => {
+      const localOrigin = "http://t3-project.localhost";
+      mocks.jetBrainsHost = {};
+      vi.stubGlobal("location", { origin: localOrigin });
+      mocks.readPreparedConnection.mockReturnValue({ httpBaseUrl: origin });
+      const image = makeImage("jetbrains-image");
+      startAttachmentUpload({ environmentId: firstEnvironment, image });
+      await Promise.resolve();
+
+      const request = TestXmlHttpRequest.requests[0]!;
+      const body = await request.sent.promise;
+      if (origin === localOrigin) {
+        expect(body).toBeInstanceOf(ArrayBuffer);
+        expect(new Uint8Array(body as ArrayBuffer)).toEqual(Uint8Array.of(1, 2, 3));
+      } else {
+        expect(body).toBe(image.file);
+      }
+      const settled = awaitAttachmentUploads([image.id]);
+      request.complete();
+      await settled;
+      expect(readAttachmentUpload(image.id)).toMatchObject({ status: "ready" });
+    },
+  );
+
+  it("does not send a JetBrains upload removed while reading its file", async () => {
+    const origin = "http://t3-project.localhost";
+    mocks.jetBrainsHost = {};
+    vi.stubGlobal("location", { origin });
+    mocks.readPreparedConnection.mockReturnValue({ httpBaseUrl: origin });
+    const image = makeImage("jetbrains-removed-image");
+    const read = Promise.withResolvers<ArrayBuffer>();
+    using readFile = vi.spyOn(image.file!, "arrayBuffer").mockReturnValue(read.promise);
+    startAttachmentUpload({ environmentId: firstEnvironment, image });
+    await Promise.resolve();
+    expect(readFile).toHaveBeenCalledOnce();
+
+    releaseAttachmentUpload(image.id);
+    read.resolve(Uint8Array.of(1, 2, 3).buffer);
+    await read.promise;
+    expect(TestXmlHttpRequest.requests[0]!.send).not.toHaveBeenCalled();
+    expect(readAttachmentUpload(image.id)).toBeUndefined();
   });
 
   it("persists a background completion's ids to the draft with no composer mounted", async () => {

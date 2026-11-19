@@ -4,12 +4,16 @@ A standalone JetBrains plugin. The tool window on the left lists local conversat
 
 ## Install and use
 
-1. In a JetBrains 2026.3 IDE with JCEF (build 263.7307 or later in the 263 series), open **Settings > Plugins > gear icon > Install Plugin from Disk**. Select `build/distributions/t3code-jetbrains-0.6.0.zip` without extracting it. Restart if prompted.
+1. In a JetBrains 2026.3 IDE with JCEF (build 263.7307 or later in the 263 series), open **Settings > Plugins > gear icon > Install Plugin from Disk**. Select the plugin ZIP under `build/distributions/` (for example, `t3code-jetbrains-0.7.8-darwin-arm64.zip` on Apple Silicon) without extracting it. Restart if prompted.
 2. Open a trusted local project. Select **T3 Code > New Chat**. Use the model picker in the composer to select Codex or Claude Code, search for a model, and choose its reasoning level. You can also enter a model ID supported by your local CLI. An existing CLI session stays with its original provider. If the executable is not found, use **CLI Paths** to specify its absolute path. Use a recent release of each CLI.
 3. Type a message and press `Enter` or click the send arrow (`Shift+Enter` inserts a newline). Responses appear as the CLI emits them. Codex defaults to **Supervised** for new chats. Use the permissions selector to choose **Auto-accept edits**, **Auto**, or **Full access**. Command and file approvals appear in the chat when requested. Full access asks for confirmation before its first use in a chat. For Codex models that advertise it, choose **Fast** or **Standard** in the model picker footer. Claude Code still exposes read/search and optional edit/write tools in this plugin.
 4. **Stop** interrupts the running CLI process. Closing a chat tab does not stop it; closing the IDE project does. Reopen a chat from the left and continue using the same provider session, as long as the provider still has its original history on disk.
 
 The chat shows assistant messages and collapsible groups of tool activity in the order they happen. Local history now includes tool labels and a limited excerpt of tool output. Older chat messages remain readable, but work that older plugin versions did not record cannot be reconstructed. The plugin does not import existing T3 Code server threads or CLI history from outside the plugin, or provide the full T3 Code interface (diffs, terminal, remote access, or interactive approvals).
+
+Office files can still be attached, but the plugin does not include an inline Office viewer or 3D device previews.
+
+Click a local file link in a conversation to open it in the current IDE project. Links with a line or column jump to that position.
 
 ## Build
 

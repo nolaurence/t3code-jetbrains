@@ -39,6 +39,7 @@ interface MarkdownFileLinkProps {
   copyMarkdown: string;
   theme: "light" | "dark";
   threadRef?: ScopedThreadRef | undefined;
+  preferEditor?: boolean | undefined;
   onOpen?: (() => Promise<AtomCommandResult<unknown, unknown>>) | undefined;
   onOpenInPanel?: ((panelPath: string, line: number | undefined) => void) | undefined;
   resolveCopyPaths: () => Promise<ReturnType<typeof markdownFileCopyPaths>>;
@@ -64,6 +65,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
   copyMarkdown,
   theme,
   threadRef,
+  preferEditor,
   onOpen,
   onOpenInPanel,
   openInEditorMenuLabel,
@@ -348,7 +350,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                if (onOpen && shouldOpenMarkdownFileLinkInEditor(event)) {
+                if (onOpen && (preferEditor || shouldOpenMarkdownFileLinkInEditor(event))) {
                   handleOpenInEditor();
                   return;
                 }
@@ -422,6 +424,7 @@ function areMarkdownFileLinkPropsEqual(
     previous.copyMarkdown === next.copyMarkdown &&
     previous.theme === next.theme &&
     previous.threadRef === next.threadRef &&
+    previous.preferEditor === next.preferEditor &&
     previous.isAppBundle === next.isAppBundle &&
     previous.onOpen === next.onOpen &&
     previous.onOpenInPanel === next.onOpenInPanel &&

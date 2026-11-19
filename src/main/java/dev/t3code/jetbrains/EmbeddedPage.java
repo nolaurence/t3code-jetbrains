@@ -8,6 +8,7 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.ui.jcef.*;
 import org.cef.browser.*;
 import org.cef.callback.CefCallback;
+import org.cef.callback.CefQueryCallback;
 import org.cef.handler.*;
 import org.cef.misc.*;
 import org.cef.network.*;
@@ -41,6 +42,21 @@ final class EmbeddedPage implements Disposable {
         var client = browser.getJBCefClient();
         var query = JBCefJSQuery.create((JBCefBrowserBase) browser);
         Disposer.register(browser, query);
+        var fileRouter = CefMessageRouter.create(
+            new CefMessageRouter.CefMessageRouterConfig("__t3OpenFile", "__t3CancelOpenFile"),
+            new CefMessageRouterHandlerAdapter() {
+                @Override public boolean onQuery(CefBrowser b, CefFrame frame, long id, String payload,
+                        boolean persistent, CefQueryCallback callback) {
+                    if (disposed || !frame.isMain() || !local(frame.getURL()) || persistent) return false;
+                    IdeFileOpener.open(runtime.project(), payload, callback);
+                    return true;
+                }
+            });
+        client.getCefClient().addMessageRouter(fileRouter);
+        Disposer.register(browser, () -> {
+            client.getCefClient().removeMessageRouter(fileRouter);
+            fileRouter.dispose();
+        });
         var editorStyles = "editor".equals(surface) ? """
             <style>
               .composer-tiptap[contenteditable="true"]:focus {

@@ -4,6 +4,11 @@ export const chatWorkspacePanelsEnabled = !isJetBrainsBuild;
 export interface JetBrainsHost {
   readonly surface: "editor" | "sidebar";
   openPage(path: string): void;
+  openFile?(target: {
+    readonly path: string;
+    readonly line?: number;
+    readonly column?: number;
+  }): Promise<void>;
 }
 
 declare global {

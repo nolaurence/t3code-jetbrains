@@ -61,12 +61,17 @@ import {
 } from "../../reviewCommentContext";
 import { TimelineRowCtx } from "./timelineRowContext";
 import { userMessageFileLabel } from "./TimelineUserMessageRow.logic";
+import {
+  reportJetBrainsFileOpenFailure,
+  useJetBrainsFileOpener,
+} from "../../hooks/useJetBrainsFileOpener";
 
 function UserMessageMentionChip(props: {
   record: Extract<KnownComposerContextRecord, { kind: "mention" }>;
   copyMarkdown: string;
 }) {
   const ctx = use(TimelineRowCtx);
+  const openInJetBrains = useJetBrainsFileOpener(ctx.activeThreadEnvironmentId, ctx.workspaceRoot);
   return (
     <Tooltip>
       <TooltipTrigger
@@ -74,10 +79,12 @@ function UserMessageMentionChip(props: {
           <ContextChip
             kind={documentChipKindForFileName(props.record.path) ?? "mention"}
             render={<button type="button" />}
-            aria-label={`Preview ${props.record.path}`}
+            aria-label={`${openInJetBrains ? "Open" : "Preview"} ${props.record.path}`}
             data-markdown-copy={props.copyMarkdown}
             onClick={() => {
-              if (ctx.threadRef)
+              if (openInJetBrains) {
+                void openInJetBrains(props.record.path).catch(reportJetBrainsFileOpenFailure);
+              } else if (ctx.threadRef)
                 useRightPanelStore.getState().openFile(ctx.threadRef, props.record.path);
             }}
           >

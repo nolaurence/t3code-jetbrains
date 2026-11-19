@@ -37,6 +37,13 @@
   window.t3JetBrains = Object.freeze({
     surface: '__T3_SURFACE__',
     openPage: (path) => nativeSend({ type: 'navigate', path }),
+    openFile: (target) => new Promise((resolve, reject) => {
+      window.__t3OpenFile({
+        request: JSON.stringify(target),
+        onSuccess: () => resolve(),
+        onFailure: (_code, message) => reject(new Error(message)),
+      });
+    }),
   });
   window.__t3IdeFrame = (frame) => {
     const socket = sockets.get(frame.id);
