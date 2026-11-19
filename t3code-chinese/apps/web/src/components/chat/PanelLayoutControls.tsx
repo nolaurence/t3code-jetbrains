@@ -1,0 +1,261 @@
+import {
+  ArrowLeftRightIcon,
+  PanelLeftIcon,
+  PanelBottomIcon,
+  PanelRightIcon,
+  SquareMenuIcon,
+  Maximize2Icon,
+  Minimize2Icon,
+} from "lucide-react";
+import { memo, type ReactNode } from "react";
+
+import { chatWorkspacePanelsEnabled } from "../../jetbrains";
+import { cn } from "~/lib/utils";
+
+import type { ThreadPanelPresentation } from "../../rightPanelLayout";
+import { PopoverCreateHandle, PopoverTrigger } from "../ui/popover";
+import { Toggle } from "../ui/toggle";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { useI18n } from "~/i18n";
+import type { RightPanelSide } from "../preview/rightPanelSide";
+
+export interface PanelLayoutControlsProps {
+  showThreadPanelControl?: boolean;
+  showTerminalControl?: boolean;
+  showRightPanelControl?: boolean;
+  terminalAvailable: boolean;
+  terminalOpen: boolean;
+  terminalShortcutLabel: string | null;
+  threadPanelOpen: boolean;
+  threadPanelPresentation: ThreadPanelPresentation;
+  threadPanelPopoverHandle?: ReturnType<typeof PopoverCreateHandle>;
+  threadPanelShortcutLabel: string | null;
+  rightPanelAvailable: boolean;
+  rightPanelOpen: boolean;
+  rightPanelShortcutLabel: string | null;
+  rightPanelUnavailableLabel?: string;
+  /** Which side the panel docks to; flips the toggle icon. */
+  rightPanelSide?: RightPanelSide;
+  /** Swap-button visibility; the sheet layout overlays the panel, so it has no side. */
+  showPanelSideSwap?: boolean;
+  onToggleTerminal: () => void;
+  onToggleThreadPanel: () => void;
+  onToggleRightPanel: () => void;
+  onToggleRightPanelSide?: () => void;
+}
+
+export const PanelLayoutControls = memo(function PanelLayoutControls({
+  showThreadPanelControl = true,
+  showTerminalControl = true,
+  showRightPanelControl = true,
+  terminalAvailable,
+  terminalOpen,
+  terminalShortcutLabel,
+  threadPanelOpen,
+  threadPanelPresentation,
+  threadPanelPopoverHandle,
+  threadPanelShortcutLabel,
+  rightPanelAvailable,
+  rightPanelOpen,
+  rightPanelShortcutLabel,
+  rightPanelUnavailableLabel,
+  rightPanelSide = "right",
+  showPanelSideSwap = false,
+  onToggleTerminal,
+  onToggleThreadPanel,
+  onToggleRightPanel,
+  onToggleRightPanelSide,
+}: PanelLayoutControlsProps) {
+  const { t } = useI18n();
+  const resolvedRightPanelUnavailableLabel =
+    rightPanelUnavailableLabel ?? t("chat.panel.rightUnavailable");
+  const sideSwapLabel =
+    rightPanelSide === "right" ? t("chat.panel.moveToLeft") : t("chat.panel.moveToRight");
+  const threadPanelToggle = (
+    <Toggle
+      className="relative shrink-0 [-webkit-app-region:no-drag]"
+      pressed={threadPanelOpen}
+      onPressedChange={threadPanelPresentation === "popover" ? undefined : onToggleThreadPanel}
+      aria-label="Toggle thread details panel"
+      variant="ghost"
+      size="sm"
+    >
+      <SquareMenuIcon className="size-4" />
+    </Toggle>
+  );
+  const threadPanelControl = (
+    <Tooltip>
+      <TooltipTrigger render={<span className="flex shrink-0" />}>
+        {threadPanelPresentation === "popover" ? (
+          <PopoverTrigger handle={threadPanelPopoverHandle} render={threadPanelToggle} />
+        ) : (
+          threadPanelToggle
+        )}
+      </TooltipTrigger>
+      <TooltipPopup side="bottom">
+        Toggle thread details
+        {threadPanelShortcutLabel ? ` (${threadPanelShortcutLabel})` : ""}
+      </TooltipPopup>
+    </Tooltip>
+  );
+
+  return (
+    <div
+      className="flex h-full shrink-0 items-center gap-1 [-webkit-app-region:no-drag]"
+      data-panel-layout-controls
+    >
+      {showThreadPanelControl ? threadPanelControl : null}
+      {chatWorkspacePanelsEnabled && showTerminalControl ? (
+        <Tooltip>
+          <TooltipTrigger render={<span className="flex shrink-0" />}>
+            <Toggle
+              className="shrink-0 [-webkit-app-region:no-drag]"
+              pressed={terminalOpen}
+              onPressedChange={onToggleTerminal}
+              aria-label={t("chat.panel.toggleTerminal")}
+              variant="ghost"
+              size="sm"
+              disabled={!terminalAvailable}
+            >
+              <PanelBottomIcon className="size-4" />
+            </Toggle>
+          </TooltipTrigger>
+          <TooltipPopup side="bottom">
+            {terminalAvailable
+              ? `${t("chat.panel.toggleTerminal")}${terminalShortcutLabel ? ` (${terminalShortcutLabel})` : ""}`
+              : t("chat.panel.terminalUnavailable")}
+          </TooltipPopup>
+        </Tooltip>
+      ) : null}
+      {chatWorkspacePanelsEnabled && showRightPanelControl ? (
+        <Tooltip>
+          <TooltipTrigger render={<span className="flex shrink-0" />}>
+            <Toggle
+              className="shrink-0 [-webkit-app-region:no-drag]"
+              pressed={rightPanelOpen}
+              onPressedChange={onToggleRightPanel}
+              aria-label={t("chat.panel.toggleRight")}
+              data-right-panel-toggle
+              variant="ghost"
+              size="sm"
+              disabled={!rightPanelAvailable}
+            >
+              {rightPanelSide === "left" ? (
+                <PanelLeftIcon className="size-4" />
+              ) : (
+                <PanelRightIcon className="size-4" />
+              )}
+            </Toggle>
+          </TooltipTrigger>
+          <TooltipPopup side="bottom">
+            {rightPanelAvailable
+              ? `${t("chat.panel.toggleRight")}${rightPanelShortcutLabel ? ` (${rightPanelShortcutLabel})` : ""}`
+              : resolvedRightPanelUnavailableLabel}
+          </TooltipPopup>
+        </Tooltip>
+      ) : null}
+      {chatWorkspacePanelsEnabled && showPanelSideSwap && onToggleRightPanelSide ? (
+        <Tooltip>
+          <TooltipTrigger render={<span className="flex shrink-0" />}>
+            <Toggle
+              className="shrink-0 [-webkit-app-region:no-drag]"
+              aria-label={sideSwapLabel}
+              variant="ghost"
+              size="sm"
+              onPressedChange={onToggleRightPanelSide}
+            >
+              <ArrowLeftRightIcon className="size-4" />
+            </Toggle>
+          </TooltipTrigger>
+          <TooltipPopup side="bottom">{sideSwapLabel}</TooltipPopup>
+        </Tooltip>
+      ) : null}
+    </div>
+  );
+});
+
+export const RightPanelMaximizeControl = memo(function RightPanelMaximizeControl({
+  maximized,
+  onToggle,
+}: {
+  maximized: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useI18n();
+  const label = maximized ? t("chat.panel.restore") : t("chat.panel.maximize");
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Toggle
+            className="shrink-0 [-webkit-app-region:no-drag]"
+            pressed={maximized}
+            onPressedChange={onToggle}
+            aria-label={label}
+            variant="ghost"
+            size="sm"
+          >
+            {maximized ? (
+              <Minimize2Icon className="size-4" />
+            ) : (
+              <Maximize2Icon className="size-4" />
+            )}
+          </Toggle>
+        }
+      />
+      <TooltipPopup side="bottom">{label}</TooltipPopup>
+    </Tooltip>
+  );
+});
+
+/** The thread panel toggle on a header whose right side the inline right panel covers. */
+export function ThreadPanelHeaderControl(props: PanelLayoutControlsProps) {
+  return (
+    <div
+      className="absolute top-[var(--workspace-controls-top)] right-[calc(env(safe-area-inset-right)+0.75rem)] z-50 flex h-[var(--workspace-topbar-height)] items-center [-webkit-app-region:no-drag]"
+      data-workspace-titlebar-controls
+    >
+      <PanelLayoutControls {...props} showTerminalControl={false} showRightPanelControl={false} />
+    </div>
+  );
+}
+
+/** The window's top-right panel controls, with the maximize toggle while the panel is open. */
+export function WorkspaceTitlebarControls(props: {
+  readonly showMaximizeControl: boolean;
+  readonly rightPanelOpen: boolean;
+  readonly animationsActive: boolean;
+  readonly maximized: boolean;
+  readonly onToggleMaximized: () => void;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div
+      className="pointer-events-none fixed top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] z-50 mr-px flex h-[var(--workspace-topbar-height)] items-center gap-1 [-webkit-app-region:no-drag]"
+      data-workspace-titlebar-controls
+    >
+      {chatWorkspacePanelsEnabled && props.showMaximizeControl ? (
+        <span
+          aria-hidden={!props.rightPanelOpen}
+          // Fading out on close would show it beside the thread details toggle that replaces it.
+          className={cn(
+            "flex shrink-0",
+            props.rightPanelOpen &&
+              props.animationsActive &&
+              "motion-safe:transition-opacity motion-safe:duration-(--panel-animation-duration) motion-safe:ease-out",
+            props.rightPanelOpen
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none absolute right-full mr-1 opacity-0",
+          )}
+          inert={!props.rightPanelOpen}
+        >
+          <RightPanelMaximizeControl
+            maximized={props.maximized}
+            onToggle={props.onToggleMaximized}
+          />
+        </span>
+      ) : null}
+      <div className="pointer-events-auto flex h-full items-center">{props.children}</div>
+    </div>
+  );
+}

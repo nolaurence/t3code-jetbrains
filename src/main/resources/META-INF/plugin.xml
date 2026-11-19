@@ -1,0 +1,14 @@
+<idea-plugin>
+  <id>dev.t3code.jetbrains</id>
+  <name>T3 Code</name>
+  <version>0.7.6</version>
+  <vendor>T3 Code JetBrains contributors</vendor>
+  <description>Use the original T3 Code web conversation interface inside JetBrains, with a bundled local runtime and your existing provider login. No separately running server or JetBrains AI required.</description>
+  <idea-version since-build="263.7307" until-build="263.*"/>
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.intellij.modules.jcef</depends>
+  <extensions defaultExtensionNs="com.intellij">
+    <toolWindow id="T3 Code" anchor="left" icon="/icons/t3.svg" factoryClass="dev.t3code.jetbrains.T3ToolWindow"/>
+    <fileEditorProvider implementation="dev.t3code.jetbrains.T3EditorProvider"/>
+  </extensions>
+</idea-plugin>

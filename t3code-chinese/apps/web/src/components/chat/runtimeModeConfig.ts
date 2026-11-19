@@ -1,0 +1,74 @@
+import {
+  managedRuntimeModeDenial,
+  type ManagedPolicySummary,
+  type RuntimeMode,
+} from "@t3tools/contracts";
+import {
+  type LucideIcon,
+  LockIcon,
+  PenLineIcon,
+  ShieldCheckIcon,
+  ShieldOffIcon,
+} from "lucide-react";
+import type { MessageKey, Translate } from "../../i18n";
+import { senderRuntimeModes } from "./ChatSenderOptions";
+
+export const runtimeModeConfig: Record<
+  RuntimeMode,
+  { label: string; description: string; icon: LucideIcon }
+> = {
+  "approval-required": {
+    ...senderRuntimeModes["approval-required"],
+    icon: LockIcon,
+  },
+  "auto-accept-edits": {
+    ...senderRuntimeModes["auto-accept-edits"],
+    icon: PenLineIcon,
+  },
+  auto: {
+    ...senderRuntimeModes["auto"],
+    icon: ShieldCheckIcon,
+  },
+  "full-access": {
+    ...senderRuntimeModes["full-access"],
+    // An open lock reads like a closed one at small sizes; a crossed shield does not.
+    icon: ShieldOffIcon,
+  },
+};
+
+export const runtimeModeOptions = Object.keys(runtimeModeConfig) as RuntimeMode[];
+
+const runtimeModeMessageKeys = {
+  "approval-required": ["chat.access.supervised", "chat.access.supervisedDescription"],
+  "auto-accept-edits": ["chat.access.autoAccept", "chat.access.autoAcceptDescription"],
+  auto: ["chat.access.auto", "chat.access.autoDescription"],
+  "full-access": ["chat.access.full", "chat.access.fullDescription"],
+} as const satisfies Record<RuntimeMode, readonly [MessageKey, MessageKey]>;
+
+export function localizedRuntimeMode(mode: RuntimeMode, t: Translate) {
+  const [label, description] = runtimeModeMessageKeys[mode];
+  return { ...runtimeModeConfig[mode], label: t(label), description: t(description) };
+}
+
+/** The modes a provider supports (all when it reports none) and the mode a thread really runs in. */
+export function resolveCompatibleRuntimeMode(
+  runtimeMode: RuntimeMode,
+  supportedRuntimeModes: ReadonlyArray<RuntimeMode> | undefined,
+) {
+  const modes =
+    supportedRuntimeModes && supportedRuntimeModes.length > 0
+      ? runtimeModeOptions.filter((mode) => supportedRuntimeModes.includes(mode))
+      : runtimeModeOptions;
+  return { modes, mode: modes.includes(runtimeMode) ? runtimeMode : (modes[0] ?? runtimeMode) };
+}
+
+export function resolveRuntimeModeOptions(
+  modes: ReadonlyArray<RuntimeMode>,
+  managedPolicy: ManagedPolicySummary | undefined,
+) {
+  return modes.map((mode) => {
+    const option = { mode, ...runtimeModeConfig[mode] };
+    const disabledReason = managedRuntimeModeDenial(managedPolicy, mode);
+    return disabledReason === undefined ? option : { ...option, disabledReason };
+  });
+}
